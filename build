@@ -1,0 +1,24 @@
+# linux上编译
+// windows
+CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -o mping.exe main.go
+// linux
+CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o mping main.go
+// linux arm
+CGO_ENABLED=0 GOOS=linux GOARCH=arm go build -o mping main.go
+ 
+# windows上编译 old
+// windows
+SET CGO_ENABLED=0
+SET GOOS=windows
+SET GOARCH=amd64
+go build -o mping.exe main.go
+// linux
+SET CGO_ENABLED=0
+SET GOOS=linux 
+SET GOARCH=amd64 
+go build -o mping main.go
+// linux arm
+SET CGO_ENABLED=0
+SET GOOS=linux
+SET GOARCH=arm
+go build -o mping main.go
