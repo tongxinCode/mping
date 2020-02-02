@@ -27,6 +27,7 @@ Options:
 var (
 	help     bool
 	test     bool
+	logFlag  bool
 	realtime bool
 
 	sendAddress    string
@@ -45,12 +46,12 @@ var (
 func init() {
 	ipReg, _ = regexp.Compile(`((2(5[0-5]|[0-4]\d))|[0-1]?\d{1,2})(\.((2(5[0-5]|[0-4]\d))|[0-1]?\d{1,2})){3}`)
 	addrReg, _ = regexp.Compile(`((2(5[0-5]|[0-4]\d))|[0-1]?\d{1,2})(\.((2(5[0-5]|[0-4]\d))|[0-1]?\d{1,2})){3}:(([2-9]\d{3})|([1-5]\d{4})|(6[0-4]\d{3})|(65[0-4]\d{2})|(655[0-2]\d)|(6553[0-5]))`)
-	logSettup()
 	flagSettup()
 }
 
 func main() {
 	flag.Parse()
+	logSettup()
 	processArgs()
 	processCommands()
 }
@@ -102,26 +103,31 @@ func getifi(addr string) (*net.Interface, error) {
 
 func logSettup() {
 	// set the formatflag of log
-	log.SetFlags(log.Lshortfile | log.LstdFlags)
-	// log.SetFlags(log.LstdFlags)
+	// log.SetFlags(log.Lshortfile | log.LstdFlags)
+	log.SetFlags(log.LstdFlags)
 	// define the log file
-	file := "./" + time.Now().Format("2006-01-02 15-04") + ".log"
-	logFile, err := os.OpenFile(file, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0766)
-	if err != nil {
-		log.Fatal(err)
+	if logFlag {
+		file := "./" + time.Now().Format("2006-01-02 15-04") + ".log"
+		logFile, err := os.OpenFile(file, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0766)
+		if err != nil {
+			log.Fatal(err)
+		}
+		writers := []io.Writer{
+			logFile,
+			os.Stdout,
+		}
+		fileAndStdoutWriter := io.MultiWriter(writers...)
+		log.SetOutput(fileAndStdoutWriter)
+		rawlog = log.New(fileAndStdoutWriter, "", 0)
+	} else {
+		rawlog = log.New(os.Stdout, "", 0)
 	}
-	writers := []io.Writer{
-		logFile,
-		os.Stdout,
-	}
-	fileAndStdoutWriter := io.MultiWriter(writers...)
-	log.SetOutput(fileAndStdoutWriter)
-	rawlog = log.New(fileAndStdoutWriter, "", 0)
 }
 
 func flagSettup() {
 	flag.BoolVar(&help, "h", false, "this help")
 	flag.BoolVar(&test, "test", false, "send and receive locally to examinate a test")
+	flag.BoolVar(&logFlag, "log", false, "determine whether to write the msg into log locally")
 	flag.BoolVar(&realtime, "time", false, "send real time as the content to examinate")
 	flag.StringVar(&sendAddress, "s", "239.255.255.255:9999", "[group:port] send packet to group")
 	flag.StringVar(&receiveAddress, "r", "239.255.255.255:9999", "[group:port] receive packet from group")
