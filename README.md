@@ -12,6 +12,9 @@
     ./multicast
     --broadcaster.go
     --listener.go
+## 编译说明
+给出了go编译的示例，在build文件中
+建议使用gox
 
 # 注意事项
 
