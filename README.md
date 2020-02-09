@@ -2,6 +2,11 @@
 [executable] multicast_test_go for multicast testing ASM &amp; SSM sending and receiving
 
 # 使用说明
+源代码运行
+    go run main.go
+编译
+    go build main.go
+跨平台、系统编译请参照build文件
 二进制文件和EXE文件选择相应的文件进行运行
 运行命令
     ./programe -h
