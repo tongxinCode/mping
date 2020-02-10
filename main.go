@@ -152,6 +152,7 @@ func processCommands() {
 	ifi, err := getifi(localAddress)
 	if ifi != nil {
 		log.Println("The index of interface used is", ifi.Index+1)
+		log.Println("The name of interface used is", ifi.Name)
 	} else {
 		fmt.Println("[Tips:determine your using interface IP]")
 		fmt.Println("[Otherwise the result may be incorrect]")

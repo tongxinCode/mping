@@ -137,7 +137,15 @@ func JoinSSM(address string, sourceAddress string, ifi *net.Interface) (*ipv4.Pa
 	if err != nil {
 		return nil, err
 	}
-	err = p.JoinSourceSpecificGroup(ifi, addr, sourceAddr)
+	// err = p.JoinSourceSpecificGroup(ifi, addr, sourceAddr)
+	// if err != nil {
+	// 	return nil, err
+	// }
+	err = p.JoinGroup(ifi, addr)
+	if err != nil {
+		return nil, err
+	}
+	err = p.ExcludeSourceSpecificGroup(ifi, addr, sourceAddr)
 	if err != nil {
 		return nil, err
 	}
@@ -155,7 +163,15 @@ func LeaveSSM(address string, sourceAddress string, ifi *net.Interface, conn *ip
 	if err != nil {
 		return err
 	}
-	err = conn.LeaveSourceSpecificGroup(ifi, addr, sourceAddr)
+	// err = conn.LeaveSourceSpecificGroup(ifi, addr, sourceAddr)
+	// if err != nil {
+	// 	return err
+	// }
+	err = conn.IncludeSourceSpecificGroup(ifi, addr, sourceAddr)
+	if err != nil {
+		return err
+	}
+	err = conn.LeaveGroup(ifi, addr)
 	if err != nil {
 		return err
 	}
