@@ -51,12 +51,8 @@ func Receive(address string, sourceAddress string, ifi *net.Interface, handler f
 	return nil
 }
 
-// Listen More explicit listen-function
+// Listen: loop and handle the log
 func Listen(packetConn *ipv4.PacketConn, handler func(*ipv4.ControlMessage, net.Addr, int, []byte)) error {
-	// err = packetConn.SetMulticastInterface(ifi)
-	// if err != nil {
-	// 	return err
-	// }
 	err := packetConn.SetMulticastLoopback(true)
 	if err != nil {
 		return nil
@@ -74,16 +70,12 @@ func Listen(packetConn *ipv4.PacketConn, handler func(*ipv4.ControlMessage, net.
 	}
 }
 
-// JoinASM will use the system built in IGMP group join mechanisms to join a group.
-// You may not see any IGMP requests sent if the system isn't ready to send them
-// (group is currently joined, and timers are good). Join does not explicitly
-// send a leave request.
+// JoinASM Join the ASM group
 func JoinASM(address string, ifi *net.Interface) (*ipv4.PacketConn, error) {
 	c, err := net.ListenPacket("udp", address)
 	if err != nil {
 		return nil, err
 	}
-	defer c.Close()
 	p := ipv4.NewPacketConn(c)
 	addr, err := net.ResolveUDPAddr("udp", address)
 	if err != nil {
@@ -97,7 +89,6 @@ func JoinASM(address string, ifi *net.Interface) (*ipv4.PacketConn, error) {
 }
 
 // LeaveASM Leave the ASM
-// IGMPv2 or IGMPv3
 func LeaveASM(address string, ifi *net.Interface, conn *ipv4.PacketConn) error {
 	addr, err := net.ResolveUDPAddr("udp", address)
 	if err != nil {
@@ -111,13 +102,11 @@ func LeaveASM(address string, ifi *net.Interface, conn *ipv4.PacketConn) error {
 }
 
 // JoinSSM Join the SSM group
-// Just for IGMPv3
 func JoinSSM(address string, sourceAddress string, ifi *net.Interface) (*ipv4.PacketConn, error) {
 	c, err := net.ListenPacket("udp", address)
 	if err != nil {
 		return nil, err
 	}
-	defer c.Close()
 	p := ipv4.NewPacketConn(c)
 	addr, err := net.ResolveUDPAddr("udp", address)
 	if err != nil {
@@ -134,8 +123,7 @@ func JoinSSM(address string, sourceAddress string, ifi *net.Interface) (*ipv4.Pa
 	return p, nil
 }
 
-// LeaveSSM Leave the SSM group
-// Just for IGMPv3
+// LeaveSSM: Leave the SSM group
 func LeaveSSM(address string, sourceAddress string, ifi *net.Interface, conn *ipv4.PacketConn) error {
 	addr, err := net.ResolveUDPAddr("udp", address)
 	if err != nil {
