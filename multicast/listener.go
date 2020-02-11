@@ -23,7 +23,7 @@ func Receive(address string, sourceAddress string, ifi *net.Interface, handler f
 		if err != nil {
 			return err
 		}
-		err = Listen(address, ifi, handler)
+		err = Listen(conn, handler)
 		if err != nil {
 			return err
 		}
@@ -36,7 +36,7 @@ func Receive(address string, sourceAddress string, ifi *net.Interface, handler f
 		if err != nil {
 			return err
 		}
-		err = Listen(address, ifi, handler)
+		err = Listen(conn, handler)
 		if err != nil {
 			return err
 		}
@@ -52,22 +52,12 @@ func Receive(address string, sourceAddress string, ifi *net.Interface, handler f
 }
 
 // Listen More explicit listen-function
-func Listen(address string, ifi *net.Interface, handler func(*ipv4.ControlMessage, net.Addr, int, []byte)) error {
-	addr, err := net.ResolveUDPAddr("udp", address)
-	if err != nil {
-		return err
-	}
-	conn, err := net.ListenMulticastUDP("udp", nil, addr)
-	if err != nil {
-		return err
-	}
-	defer conn.Close()
-	packetConn := ipv4.NewPacketConn(conn)
-	err = packetConn.SetMulticastInterface(ifi)
-	if err != nil {
-		return err
-	}
-	err = packetConn.SetMulticastLoopback(true)
+func Listen(packetConn *ipv4.PacketConn, handler func(*ipv4.ControlMessage, net.Addr, int, []byte)) error {
+	// err = packetConn.SetMulticastInterface(ifi)
+	// if err != nil {
+	// 	return err
+	// }
+	err := packetConn.SetMulticastLoopback(true)
 	if err != nil {
 		return nil
 	}
@@ -137,15 +127,7 @@ func JoinSSM(address string, sourceAddress string, ifi *net.Interface) (*ipv4.Pa
 	if err != nil {
 		return nil, err
 	}
-	// err = p.JoinSourceSpecificGroup(ifi, addr, sourceAddr)
-	// if err != nil {
-	// 	return nil, err
-	// }
-	err = p.JoinGroup(ifi, addr)
-	if err != nil {
-		return nil, err
-	}
-	err = p.ExcludeSourceSpecificGroup(ifi, addr, sourceAddr)
+	err = p.JoinSourceSpecificGroup(ifi, addr, sourceAddr)
 	if err != nil {
 		return nil, err
 	}
@@ -163,15 +145,7 @@ func LeaveSSM(address string, sourceAddress string, ifi *net.Interface, conn *ip
 	if err != nil {
 		return err
 	}
-	// err = conn.LeaveSourceSpecificGroup(ifi, addr, sourceAddr)
-	// if err != nil {
-	// 	return err
-	// }
-	err = conn.IncludeSourceSpecificGroup(ifi, addr, sourceAddr)
-	if err != nil {
-		return err
-	}
-	err = conn.LeaveGroup(ifi, addr)
+	err = conn.LeaveSourceSpecificGroup(ifi, addr, sourceAddr)
 	if err != nil {
 		return err
 	}
