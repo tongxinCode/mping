@@ -1,5 +1,5 @@
 # mping
-[executable] multicast_test_go for multicast testing ASM &amp; SSM sending and receiving
+[executable] multicast test for multicast testing ASM & SSM sending and receiving
 
 # 使用说明
 源代码运行
@@ -9,7 +9,12 @@
 跨平台、系统编译请参照build文件
 二进制文件和EXE文件选择相应的文件进行运行
 运行命令
+    go run main.go -h
+    
+    or
+    
     ./programe -h
+    
 查看帮助
 
 # 核心代码
