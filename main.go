@@ -17,8 +17,8 @@ import (
 )
 
 const (
-	usage = `mping version: mping/1.0
-Usage: ./mping [-h] [-t targetGroup] [-r receiveGroup] [-l localAddress] [-s sourceAddress] [-m message] [-i interval] [-log path]
+	usage = `mping version: mping/1.1
+Usage: ./mping [-h] [-s sendGroup] [-r receiveGroup] [-l localAddress] [-S sourceAddress] [-m message] [-i interval] [-log path]
 
 Options:
 `
