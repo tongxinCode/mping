@@ -17,17 +17,23 @@ import (
 )
 
 const (
-	usage = `mping version: mping/1.1
+	usage = `mping version: mping/1.2
 Usage: ./mping [-h] [-s sendGroup] [-r receiveGroup] [-l localAddress] [-S sourceAddress] [-m message] [-i interval] [-log path]
 
 Options:
 `
 )
 
+const (
+	MAX_DATA_SIZE = 65504
+	FIT_DATA_SIZE = 1472
+)
+
 var (
 	help     bool
 	test     bool
 	realtime bool
+	hexdata  bool
 	logPath  string
 
 	sendAddress    string
@@ -36,6 +42,13 @@ var (
 	sourceAddress  string
 	content        string
 	interval       int
+	dataSize       int
+
+	clock_start    time.Time
+	clock_end      time.Time
+	clock_mutex    bool
+	bytes_send_sum float64
+	bytes_rev_sum  float64
 
 	rawlog *log.Logger
 
@@ -44,6 +57,9 @@ var (
 )
 
 func init() {
+	clock_mutex = false
+	bytes_send_sum = 0
+	bytes_rev_sum = 0
 	ipReg, _ = regexp.Compile(`((2(5[0-5]|[0-4]\d))|[0-1]?\d{1,2})(\.((2(5[0-5]|[0-4]\d))|[0-1]?\d{1,2})){3}`)
 	addrReg, _ = regexp.Compile(`((2(5[0-5]|[0-4]\d))|[0-1]?\d{1,2})(\.((2(5[0-5]|[0-4]\d))|[0-1]?\d{1,2})){3}:(([2-9]\d{3})|([1-5]\d{4})|(6[0-4]\d{3})|(65[0-4]\d{2})|(655[0-2]\d)|(6553[0-5]))`)
 	flagSettup()
@@ -60,13 +76,47 @@ func msgReceiveHandler(cm *ipv4.ControlMessage, src net.Addr, n int, b []byte) {
 	if cm != nil {
 		log.Println(cm.String())
 	}
+	if clock_mutex == false {
+		clock_start = time.Now()
+		clock_mutex = true
+	} else {
+		clock_end = time.Now()
+		bytes_rev_sum = bytes_rev_sum + float64(n)
+		rates_rev := bytes_rev_sum * 1000000000 / float64(clock_end.Sub(clock_start).Nanoseconds())
+		if rates_rev < 1000 {
+			log.Println(rates_rev, "Bps")
+		} else if rates_rev < 1000000 {
+			log.Println(rates_rev/1024, "KBps")
+		} else if rates_rev < 1000000000 {
+			log.Println(rates_rev/1024/1024, "MBps")
+		}
+	}
 	log.Println(n, "bytes read from", src)
-	rawlog.Println(hex.Dump(b[:n]))
+	if hexdata {
+		rawlog.Println(hex.Dump(b[:n]))
+	}
 }
 
 func msgSendHandler(n int, b []byte) {
+	if clock_mutex == false {
+		clock_start = time.Now()
+		clock_mutex = true
+	} else {
+		clock_end = time.Now()
+		bytes_send_sum = bytes_send_sum + float64(n)
+		rates_send := bytes_send_sum * 1000000000 / float64(clock_end.Sub(clock_start).Nanoseconds())
+		if rates_send < 1000 {
+			log.Println(rates_send, "Bps")
+		} else if rates_send < 1000000 {
+			log.Println(rates_send/1024, "KBps")
+		} else if rates_send < 1000000000 {
+			log.Println(rates_send/1024/1024, "MBps")
+		}
+	}
 	log.Println(n, "bytes has been sent")
-	rawlog.Println(hex.Dump(b[:n]))
+	if hexdata {
+		rawlog.Println(hex.Dump(b[:n]))
+	}
 }
 
 func getifi(addr string) (*net.Interface, error) {
@@ -128,13 +178,15 @@ func flagSettup() {
 	flag.BoolVar(&help, "h", false, "this help")
 	flag.BoolVar(&test, "test", false, "send and receive locally to examinate a test")
 	flag.BoolVar(&realtime, "time", false, "send real time as the content to examinate")
+	flag.BoolVar(&hexdata, "x", false, "whether to show the hex data")
 	flag.StringVar(&logPath, "log", "/", "[/tmp/] or [C:\\] determine whether to log, Path e.g ./, Forbidden /")
 	flag.StringVar(&sendAddress, "s", "239.255.255.255:9999", "[group:port] send packet to group")
 	flag.StringVar(&receiveAddress, "r", "239.255.255.255:9999", "[group:port] receive packet from group")
 	flag.StringVar(&localAddress, "l", "127.0.0.1:8888", "[ip[:port]] must choose your local using interface")
 	flag.StringVar(&sourceAddress, "S", "127.0.0.1:8888", "[ip[:port]] must determine the peer source ip if using SSM")
 	flag.StringVar(&content, "m", "hello, world\n", "[[]byte] change the content of sending")
-	flag.IntVar(&interval, "i", 1000, "[number] change the interval between package sent")
+	flag.IntVar(&interval, "i", 1000000000, "[number] change the interval between package sent (unit:Nanosecond)")
+	flag.IntVar(&dataSize, "p", -1, "[number] the size of payload data(0 means use 1472 bytes payloads)")
 	flag.Usage = flagUsage
 }
 
@@ -170,6 +222,15 @@ func processCommands() {
 	}
 	if realtime {
 		content = time.Now().Format("2006-01-02 15:04:05")
+	}
+	if dataSize == 0 {
+		dataSize = FIT_DATA_SIZE
+	}
+	if dataSize != -1 && dataSize > len(content) && dataSize <= MAX_DATA_SIZE {
+		var data []byte = make([]byte, dataSize-len(content))
+		content = string(strconv.AppendQuoteToASCII(data, content))
+	} else if dataSize > MAX_DATA_SIZE {
+		log.Fatal("big packet")
 	}
 	if (sendAddress != "239.255.255.255:9999") && (receiveAddress != "239.255.255.255:9999") {
 		log.Println("Send to ", sendAddress)

@@ -68,7 +68,7 @@ func Broadcast(address string, localaddress string) (*Packet, error) {
 }
 
 // write buffer into the connection
-func Send(address string, localaddress string, content string, intervalms int, handler func(int, []byte)) error {
+func Send(address string, localaddress string, content string, intervalns int, handler func(int, []byte)) error {
 	p, err := Broadcast(address, localaddress)
 	if err != nil || p.udpConn == nil || p.packetConn == nil {
 		return err
@@ -76,8 +76,7 @@ func Send(address string, localaddress string, content string, intervalms int, h
 
 	for {
 		p.udpConn.Write([]byte(content))
-		time.Sleep(time.Duration(intervalms) * time.Millisecond)
-
+		time.Sleep(time.Duration(intervalns) * time.Nanosecond)
 		handler(len(content), []byte(content))
 	}
 }
