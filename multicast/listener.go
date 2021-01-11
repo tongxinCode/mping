@@ -9,7 +9,7 @@ import (
 )
 
 const (
-	maxDatagramSize = 2 * 64 * 1024
+	maxDatagramSize = 8 * 64 * 1024
 )
 
 // Receive is a function providing ASM and SSM receive function

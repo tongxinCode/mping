@@ -67,16 +67,16 @@ func Broadcast(address string, localaddress string) (*Packet, error) {
 	return p, nil
 }
 
-// write buffer into the connection
-func Send(address string, localaddress string, content string, intervalns int, handler func(int, []byte)) error {
+// write buffer([]byte) into the connection
+func Send(address string, localaddress string, content_byte []byte, intervalns int, handler func(int, []byte)) error {
 	p, err := Broadcast(address, localaddress)
 	if err != nil || p.udpConn == nil || p.packetConn == nil {
 		return err
 	}
 
 	for {
-		p.udpConn.Write([]byte(content))
+		p.udpConn.Write(content_byte)
 		time.Sleep(time.Duration(intervalns) * time.Nanosecond)
-		handler(len(content), []byte(content))
+		handler(len(content_byte), content_byte)
 	}
 }

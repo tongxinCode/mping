@@ -41,14 +41,15 @@ var (
 	localAddress   string
 	sourceAddress  string
 	content        string
+	content_byte   []byte
 	interval       int
 	dataSize       int
 
 	clock_start    time.Time
 	clock_end      time.Time
 	clock_mutex    bool
-	bytes_send_sum float64
-	bytes_rev_sum  float64
+	bytes_send_sum float32
+	bytes_rev_sum  float32
 
 	rawlog *log.Logger
 
@@ -81,8 +82,8 @@ func msgReceiveHandler(cm *ipv4.ControlMessage, src net.Addr, n int, b []byte) {
 		clock_mutex = true
 	} else {
 		clock_end = time.Now()
-		bytes_rev_sum = bytes_rev_sum + float64(n)
-		rates_rev := bytes_rev_sum * 1000000000 / float64(clock_end.Sub(clock_start).Nanoseconds())
+		bytes_rev_sum = bytes_rev_sum + float32(n)
+		rates_rev := bytes_rev_sum * 1000000000 / float32(clock_end.Sub(clock_start).Nanoseconds())
 		if rates_rev < 1000 {
 			log.Println(rates_rev, "Bps")
 		} else if rates_rev < 1000000 {
@@ -103,8 +104,8 @@ func msgSendHandler(n int, b []byte) {
 		clock_mutex = true
 	} else {
 		clock_end = time.Now()
-		bytes_send_sum = bytes_send_sum + float64(n)
-		rates_send := bytes_send_sum * 1000000000 / float64(clock_end.Sub(clock_start).Nanoseconds())
+		bytes_send_sum = bytes_send_sum + float32(n)
+		rates_send := bytes_send_sum * 1000000000 / float32(clock_end.Sub(clock_start).Nanoseconds())
 		if rates_send < 1000 {
 			log.Println(rates_send, "Bps")
 		} else if rates_send < 1000000 {
@@ -213,7 +214,8 @@ func processCommands() {
 		log.Fatal(err)
 	}
 	if test {
-		go multicast.Send(sendAddress, localAddress, content, interval, msgSendHandler)
+		content_byte = []byte(content)
+		go multicast.Send(sendAddress, localAddress, content_byte, interval, msgSendHandler)
 		err = multicast.Receive(receiveAddress, sourceAddress, ifi, msgReceiveHandler)
 		if err != nil {
 			log.Fatal(err)
@@ -222,19 +224,23 @@ func processCommands() {
 	}
 	if realtime {
 		content = time.Now().Format("2006-01-02 15:04:05")
+		content_byte = []byte(content)
 	}
-	if dataSize == 0 {
+	if dataSize == -1 {
+		content_byte = []byte(content)
+	} else if dataSize == 0 {
 		dataSize = FIT_DATA_SIZE
-	}
-	if dataSize != -1 && dataSize > len(content) && dataSize <= MAX_DATA_SIZE {
 		var data []byte = make([]byte, dataSize-len(content))
-		content = string(strconv.AppendQuoteToASCII(data, content))
+		content_byte = strconv.AppendQuoteToASCII(data, content)
+	} else if dataSize > len(content) && dataSize <= MAX_DATA_SIZE {
+		var data []byte = make([]byte, dataSize-len(content))
+		content_byte = strconv.AppendQuoteToASCII(data, content)
 	} else if dataSize > MAX_DATA_SIZE {
 		log.Fatal("big packet")
 	}
 	if (sendAddress != "239.255.255.255:9999") && (receiveAddress != "239.255.255.255:9999") {
 		log.Println("Send to ", sendAddress)
-		go multicast.Send(sendAddress, localAddress, content, interval, msgSendHandler)
+		go multicast.Send(sendAddress, localAddress, content_byte, interval, msgSendHandler)
 		log.Println("Receive from ", receiveAddress)
 		err := multicast.Receive(receiveAddress, sourceAddress, ifi, msgReceiveHandler)
 		if err != nil {
@@ -242,7 +248,7 @@ func processCommands() {
 		}
 	} else if sendAddress != "239.255.255.255:9999" && (receiveAddress == "239.255.255.255:9999") {
 		log.Println("Send to ", sendAddress)
-		err := multicast.Send(sendAddress, localAddress, content, interval, msgSendHandler)
+		err := multicast.Send(sendAddress, localAddress, content_byte, interval, msgSendHandler)
 		if err != nil {
 			log.Fatal(err)
 		}
