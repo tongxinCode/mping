@@ -17,7 +17,7 @@ import (
 )
 
 const (
-	usage = `mping version: mping/1.2
+	usage = `mping version: mping/1.3
 Usage: ./mping [-h] [-s sendGroup] [-r receiveGroup] [-l localAddress] [-S sourceAddress] [-m message] [-i interval] [-log path]
 
 Options:
@@ -44,6 +44,7 @@ var (
 	content_byte   []byte
 	interval       int
 	dataSize       int
+	totalPackets   int
 
 	clock_start    time.Time
 	clock_end      time.Time
@@ -61,6 +62,7 @@ func init() {
 	clock_mutex = false
 	bytes_send_sum = 0
 	bytes_rev_sum = 0
+	totalPackets = 0
 	ipReg, _ = regexp.Compile(`((2(5[0-5]|[0-4]\d))|[0-1]?\d{1,2})(\.((2(5[0-5]|[0-4]\d))|[0-1]?\d{1,2})){3}`)
 	addrReg, _ = regexp.Compile(`((2(5[0-5]|[0-4]\d))|[0-1]?\d{1,2})(\.((2(5[0-5]|[0-4]\d))|[0-1]?\d{1,2})){3}:(([2-9]\d{3})|([1-5]\d{4})|(6[0-4]\d{3})|(65[0-4]\d{2})|(655[0-2]\d)|(6553[0-5]))`)
 	flagSettup()
@@ -76,6 +78,8 @@ func main() {
 func msgReceiveHandler(cm *ipv4.ControlMessage, src net.Addr, n int, b []byte) {
 	if cm != nil {
 		log.Println(cm.String())
+		totalPackets ++
+		log.Println("Total packets received:", totalPackets)
 	}
 	if clock_mutex == false {
 		clock_start = time.Now()
