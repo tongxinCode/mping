@@ -12,7 +12,7 @@ import (
 	"strconv"
 	"time"
 
-	"./multicast"
+	"mping/multicast"
 	"golang.org/x/net/ipv4"
 )
 

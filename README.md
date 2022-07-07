@@ -1,38 +1,62 @@
 # mping
 [executable] multicast test for multicast testing ASM & SSM sending and receiving
 
+[可执行] 组播测试工具（指定源组播和任意源组播shou'fa）
+
 # 使用说明
-源代码运行
-    go run main.go
-编译
-    go build main.go
-跨平台、系统编译请参照build文件
+跨平台、系统编译请参照编译说明
+
 二进制文件和EXE文件选择相应的文件进行运行
-运行命令
-    go run main.go -h
-    
-    or
-    
-    ./programe -h
-    
-查看帮助
+
+运行以下命令查看帮助
+```bash
+go run main.go -h    
+# or    
+./programe -h
+```
 
 # 核心代码
     main.go
     ./multicast
     --broadcaster.go
     --listener.go
+
 ## 编译说明
-给出了go编译的示例，在build文件中
-建议使用gox
+下方给出了go编译的示例
+
+```bash
+# generally
+// windows
+CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -o mping.exe main.go
+// linux
+CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o mping main.go
+// linux arm
+CGO_ENABLED=0 GOOS=linux GOARCH=arm go build -o mping main.go
+ 
+# or
+# windows
+SET CGO_ENABLED=0
+SET GOOS=windows
+SET GOARCH=amd64
+go build -o mping.exe main.go
+# linux
+SET CGO_ENABLED=0
+SET GOOS=linux 
+SET GOARCH=amd64 
+go build -o mping main.go
+# linux arm
+SET CGO_ENABLED=0
+SET GOOS=linux
+SET GOARCH=arm
+go build -o mping main.go
+
+```
 
 # 注意事项
 
-## 编译
-需要
-    import "golang.org/x/net/ipv4"
-
-可以自行GitHub golang/net查找
+## 版本介绍
+v1.4.0
+将程序适配go 1.18，增加go mod适配
 
 ## golang库未完善
 
