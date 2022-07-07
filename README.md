@@ -22,16 +22,16 @@ go run main.go -h
     --listener.go
 
 ## 编译说明
-下方给出了go编译的示例
+下方给出了go编译的示例，你也可以使用build.sh编译构建
 
 ```bash
 # generally
 // windows
-CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -o build/mping.exe main.go
+CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -o mping.exe main.go
 // linux
-CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o build/mping main.go
+CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o mping main.go
 // linux arm
-CGO_ENABLED=0 GOOS=linux GOARCH=arm go build -o build/mping-arm main.go
+CGO_ENABLED=0 GOOS=linux GOARCH=arm go build -o mping main.go
  
 # or
 # windows
