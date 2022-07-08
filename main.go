@@ -19,7 +19,7 @@ import (
 )
 
 const (
-	usage = `mping version: mping/1.4.0
+	usage = `mping version: mping/1.5.0
 Usage: ./mping [-h] [-s sendGroup] [-r receiveGroup] [-l localAddress] [-S sourceAddress] [-m message] [-i interval] [-log path]
 
 Options:
