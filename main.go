@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/binary"
 	"encoding/hex"
 	"flag"
 	"fmt"
@@ -13,6 +14,7 @@ import (
 	"time"
 
 	"mping/multicast"
+
 	"golang.org/x/net/ipv4"
 )
 
@@ -30,27 +32,33 @@ const (
 )
 
 var (
-	help     bool
-	test     bool
-	realtime bool
-	hexdata  bool
-	logPath  string
-
+	help           bool
+	test           bool
+	realtime       bool
+	hexdata        bool
+	count          bool
+	logRefresh     bool
+	logPath        string
 	sendAddress    string
 	receiveAddress string
 	localAddress   string
 	sourceAddress  string
 	content        string
-	content_byte   []byte
+	contentByte    []byte
 	interval       int
 	dataSize       int
-	totalPackets   int
 
-	clock_start    time.Time
-	clock_end      time.Time
-	clock_mutex    bool
-	bytes_send_sum float32
-	bytes_rev_sum  float32
+	clock_start time.Time
+	clock_end   time.Time
+	clock_mutex bool
+
+	bytes_send_sum     float32
+	bytes_rev_sum      float32
+	packet_rev_sum     uint32
+	packet_rev_theory  uint32
+	packet_number_cur  uint32
+	packet_number_last uint32
+	packet_number_send uint32
 
 	rawlog *log.Logger
 
@@ -62,7 +70,9 @@ func init() {
 	clock_mutex = false
 	bytes_send_sum = 0
 	bytes_rev_sum = 0
-	totalPackets = 0
+	packet_rev_sum = 0
+	packet_rev_theory = 0
+	content = fmt.Sprint(packet_number_send)
 	ipReg, _ = regexp.Compile(`((2(5[0-5]|[0-4]\d))|[0-1]?\d{1,2})(\.((2(5[0-5]|[0-4]\d))|[0-1]?\d{1,2})){3}`)
 	addrReg, _ = regexp.Compile(`((2(5[0-5]|[0-4]\d))|[0-1]?\d{1,2})(\.((2(5[0-5]|[0-4]\d))|[0-1]?\d{1,2})){3}:(([2-9]\d{3})|([1-5]\d{4})|(6[0-4]\d{3})|(65[0-4]\d{2})|(655[0-2]\d)|(6553[0-5]))`)
 	flagSettup()
@@ -78,10 +88,22 @@ func main() {
 func msgReceiveHandler(cm *ipv4.ControlMessage, src net.Addr, n int, b []byte) {
 	if cm != nil {
 		log.Println(cm.String())
-		totalPackets ++
-		log.Println("Total packets received:", totalPackets)
+		packet_rev_sum++
+		if packet_number_cur == 0 {
+			packet_number_cur = binary.BigEndian.Uint32(b[0:4])
+			packet_rev_theory = 1
+		} else {
+			packet_number_last = packet_number_cur
+			packet_number_cur = binary.BigEndian.Uint32(b[0:4])
+			packet_rev_theory = packet_rev_theory + (packet_number_cur - packet_number_last)
+		}
+		if count {
+			log.Printf("Total packets received:%d/%d\n", packet_rev_sum, packet_rev_theory)
+		} else {
+			log.Printf("Total packets received:%d\n", packet_rev_sum)
+		}
 	}
-	if clock_mutex == false {
+	if !clock_mutex {
 		clock_start = time.Now()
 		clock_mutex = true
 	} else {
@@ -103,7 +125,7 @@ func msgReceiveHandler(cm *ipv4.ControlMessage, src net.Addr, n int, b []byte) {
 }
 
 func msgSendHandler(n int, b []byte) {
-	if clock_mutex == false {
+	if !clock_mutex {
 		clock_start = time.Now()
 		clock_mutex = true
 	} else {
@@ -160,7 +182,7 @@ func logSettup() {
 	// set the formatflag of log
 	// log.SetFlags(log.Lshortfile | log.LstdFlags)
 	log.SetFlags(log.LstdFlags)
-	// define the log file
+	// define the log writer
 	if logPath != "/" {
 		file := logPath + time.Now().Format("2006-01-02 15-04") + ".log"
 		logFile, err := os.OpenFile(file, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0766)
@@ -184,14 +206,16 @@ func flagSettup() {
 	flag.BoolVar(&test, "test", false, "send and receive locally to examinate a test")
 	flag.BoolVar(&realtime, "time", false, "send real time as the content to examinate")
 	flag.BoolVar(&hexdata, "x", false, "whether to show the hex data")
+	flag.BoolVar(&count, "c", false, "whether to count Packet loss rate")
+	flag.BoolVar(&logRefresh, "refresh", false, "whether to use dynamic refresh log in terminal")
 	flag.StringVar(&logPath, "log", "/", "[/tmp/] or [C:\\] determine whether to log, Path e.g ./, Forbidden /")
 	flag.StringVar(&sendAddress, "s", "239.255.255.255:9999", "[group:port] send packet to group")
 	flag.StringVar(&receiveAddress, "r", "239.255.255.255:9999", "[group:port] receive packet from group")
 	flag.StringVar(&localAddress, "l", "127.0.0.1:8888", "[ip[:port]] must choose your local using interface")
 	flag.StringVar(&sourceAddress, "S", "127.0.0.1:8888", "[ip[:port]] must determine the peer source ip if using SSM")
-	flag.StringVar(&content, "m", "hello, world\n", "[[]byte] change the content of sending")
+	flag.StringVar(&content, "m", "Init Data", "[[]byte] change the content of sending")
 	flag.IntVar(&interval, "i", 1000000000, "[number] change the interval between package sent (unit:Nanosecond)")
-	flag.IntVar(&dataSize, "p", -1, "[number] the size of payload data(0 means use 1472 bytes payloads)")
+	flag.IntVar(&dataSize, "p", -1, "[number] the size of payload data(0 means use 1472 Bytes payloads)")
 	flag.Usage = flagUsage
 }
 
@@ -211,40 +235,49 @@ func processCommands() {
 		log.Println("The index of interface used is", ifi.Index+1)
 		log.Println("The name of interface used is", ifi.Name)
 	} else {
-		fmt.Println("[Tips:determine your using interface IP]")
-		fmt.Println("[Otherwise the result may be incorrect]")
+		log.Println("[Tips:determine your using interface IP]")
+		log.Println("[Otherwise the result may be incorrect]")
 	}
 	if err != nil {
 		log.Fatal(err)
 	}
-	if test {
-		content_byte = []byte(content)
-		go multicast.Send(sendAddress, localAddress, content_byte, interval, msgSendHandler)
-		err = multicast.Receive(receiveAddress, sourceAddress, ifi, msgReceiveHandler)
-		if err != nil {
-			log.Fatal(err)
-		}
-		return
-	}
-	if realtime {
-		content = time.Now().Format("2006-01-02 15:04:05")
-		content_byte = []byte(content)
-	}
 	if dataSize == -1 {
-		content_byte = []byte(content)
+		var data []byte = make([]byte, 4)
+		contentByte = strconv.AppendQuoteToASCII(data, content)
 	} else if dataSize == 0 {
 		dataSize = FIT_DATA_SIZE
 		var data []byte = make([]byte, dataSize-len(content))
-		content_byte = strconv.AppendQuoteToASCII(data, content)
+		contentByte = strconv.AppendQuoteToASCII(data, content)
+	} else if dataSize > 0 && dataSize < 4 {
+		log.Fatal("small packet")
 	} else if dataSize > len(content) && dataSize <= MAX_DATA_SIZE {
 		var data []byte = make([]byte, dataSize-len(content))
-		content_byte = strconv.AppendQuoteToASCII(data, content)
+		contentByte = strconv.AppendQuoteToASCII(data, content)
 	} else if dataSize > MAX_DATA_SIZE {
 		log.Fatal("big packet")
 	}
 	if (sendAddress != "239.255.255.255:9999") && (receiveAddress != "239.255.255.255:9999") {
 		log.Println("Send to ", sendAddress)
-		go multicast.Send(sendAddress, localAddress, content_byte, interval, msgSendHandler)
+		go func() {
+			p, err := multicast.Broadcast(sendAddress, localAddress)
+			if err != nil || p.UdpConn == nil || p.PacketConn == nil {
+				log.Fatal(err)
+			}
+			for {
+				packet_number_send++
+				if realtime {
+					content = time.Now().Format("2006-01-02 15:04:05")
+					contentByte = strconv.AppendQuoteToASCII(contentByte[0:4], content)
+				}
+				if count {
+					binary.BigEndian.PutUint32(contentByte[0:4], packet_number_send)
+				}
+				err := multicast.Send(p, contentByte, interval, msgSendHandler)
+				if err != nil {
+					log.Fatal(err)
+				}
+			}
+		}()
 		log.Println("Receive from ", receiveAddress)
 		err := multicast.Receive(receiveAddress, sourceAddress, ifi, msgReceiveHandler)
 		if err != nil {
@@ -252,10 +285,26 @@ func processCommands() {
 		}
 	} else if sendAddress != "239.255.255.255:9999" && (receiveAddress == "239.255.255.255:9999") {
 		log.Println("Send to ", sendAddress)
-		err := multicast.Send(sendAddress, localAddress, content_byte, interval, msgSendHandler)
-		if err != nil {
-			log.Fatal(err)
-		}
+		go func() {
+			p, err := multicast.Broadcast(sendAddress, localAddress)
+			if err != nil || p.UdpConn == nil || p.PacketConn == nil {
+				log.Fatal(err)
+			}
+			for {
+				packet_number_send++
+				if realtime {
+					content = time.Now().Format("2006-01-02 15:04:05")
+					contentByte = strconv.AppendQuoteToASCII(contentByte[0:4], content)
+				}
+				if count {
+					binary.BigEndian.PutUint32(contentByte[0:4], packet_number_send)
+				}
+				err := multicast.Send(p, contentByte, interval, msgSendHandler)
+				if err != nil {
+					log.Fatal(err)
+				}
+			}
+		}()
 	} else if receiveAddress != "239.255.255.255:9999" && (sendAddress == "239.255.255.255:9999") {
 		log.Println("Receive from ", receiveAddress)
 		err := multicast.Receive(receiveAddress, sourceAddress, ifi, msgReceiveHandler)
@@ -263,7 +312,34 @@ func processCommands() {
 			log.Fatal(err)
 		}
 	}
-	fmt.Println(`Please input the right arguments(use "-h" to see help)`)
+	if test {
+		go func() {
+			p, err := multicast.Broadcast(sendAddress, localAddress)
+			if err != nil || p.UdpConn == nil || p.PacketConn == nil {
+				log.Fatal(err)
+			}
+			for {
+				packet_number_send++
+				if realtime {
+					content = time.Now().Format("2006-01-02 15:04:05")
+					contentByte = strconv.AppendQuoteToASCII(contentByte[0:4], content)
+				}
+				if count {
+					binary.BigEndian.PutUint32(contentByte[0:4], packet_number_send)
+				}
+				err := multicast.Send(p, contentByte, interval, msgSendHandler)
+				if err != nil {
+					log.Fatal(err)
+				}
+			}
+		}()
+		err = multicast.Receive(receiveAddress, sourceAddress, ifi, msgReceiveHandler)
+		if err != nil {
+			log.Fatal(err)
+		}
+		return
+	}
+	log.Println(`Please input the right arguments(use "-h" to see help)`)
 }
 
 func processArgs() {
