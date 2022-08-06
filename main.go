@@ -11,6 +11,7 @@ import (
 	"os"
 	"regexp"
 	"strconv"
+	"sync"
 	"time"
 
 	"mping/multicast"
@@ -19,7 +20,7 @@ import (
 )
 
 const (
-	usage = `mping version: mping/1.5.0
+	usage = `mping version: mping/1.6.0
 Usage: ./mping [-h] [-s sendGroup] [-r receiveGroup] [-l localAddress] [-S sourceAddress] [-m message] [-i interval] [-log path]
 
 Options:
@@ -37,7 +38,6 @@ var (
 	realtime       bool
 	hexdata        bool
 	count          bool
-	logRefresh     bool
 	logPath        string
 	sendAddress    string
 	receiveAddress string
@@ -207,7 +207,6 @@ func flagSettup() {
 	flag.BoolVar(&realtime, "time", false, "send real time as the content to examinate")
 	flag.BoolVar(&hexdata, "x", false, "whether to show the hex data")
 	flag.BoolVar(&count, "c", false, "whether to count Packet loss rate")
-	flag.BoolVar(&logRefresh, "refresh", false, "whether to use dynamic refresh log in terminal")
 	flag.StringVar(&logPath, "log", "/", "[/tmp/] or [C:\\] determine whether to log, Path e.g ./, Forbidden /")
 	flag.StringVar(&sendAddress, "s", "239.255.255.255:9999", "[group:port] send packet to group")
 	flag.StringVar(&receiveAddress, "r", "239.255.255.255:9999", "[group:port] receive packet from group")
@@ -225,6 +224,7 @@ func flagUsage() {
 }
 
 func processCommands() {
+	var wg sync.WaitGroup
 	if help {
 		flag.Usage()
 		return
@@ -258,7 +258,9 @@ func processCommands() {
 	}
 	if (sendAddress != "239.255.255.255:9999") && (receiveAddress != "239.255.255.255:9999") {
 		log.Println("Send to ", sendAddress)
-		go func() {
+		wg.Add(1)
+		go func(wg *sync.WaitGroup) {
+			defer wg.Done()
 			p, err := multicast.Broadcast(sendAddress, localAddress)
 			if err != nil || p.UdpConn == nil || p.PacketConn == nil {
 				log.Fatal(err)
@@ -277,7 +279,7 @@ func processCommands() {
 					log.Fatal(err)
 				}
 			}
-		}()
+		}(&wg)
 		log.Println("Receive from ", receiveAddress)
 		err := multicast.Receive(receiveAddress, sourceAddress, ifi, msgReceiveHandler)
 		if err != nil {
@@ -285,7 +287,9 @@ func processCommands() {
 		}
 	} else if sendAddress != "239.255.255.255:9999" && (receiveAddress == "239.255.255.255:9999") {
 		log.Println("Send to ", sendAddress)
-		go func() {
+		wg.Add(1)
+		go func(wg *sync.WaitGroup) {
+			defer wg.Done()
 			p, err := multicast.Broadcast(sendAddress, localAddress)
 			if err != nil || p.UdpConn == nil || p.PacketConn == nil {
 				log.Fatal(err)
@@ -304,16 +308,22 @@ func processCommands() {
 					log.Fatal(err)
 				}
 			}
-		}()
+		}(&wg)
 	} else if receiveAddress != "239.255.255.255:9999" && (sendAddress == "239.255.255.255:9999") {
 		log.Println("Receive from ", receiveAddress)
-		err := multicast.Receive(receiveAddress, sourceAddress, ifi, msgReceiveHandler)
-		if err != nil {
-			log.Fatal(err)
-		}
+		wg.Add(1)
+		go func(wg *sync.WaitGroup) {
+			defer wg.Done()
+			err := multicast.Receive(receiveAddress, sourceAddress, ifi, msgReceiveHandler)
+			if err != nil {
+				log.Fatal(err)
+			}
+		}(&wg)
 	}
 	if test {
-		go func() {
+		wg.Add(1)
+		go func(wg *sync.WaitGroup) {
+			defer wg.Done()
 			p, err := multicast.Broadcast(sendAddress, localAddress)
 			if err != nil || p.UdpConn == nil || p.PacketConn == nil {
 				log.Fatal(err)
@@ -332,13 +342,13 @@ func processCommands() {
 					log.Fatal(err)
 				}
 			}
-		}()
+		}(&wg)
 		err = multicast.Receive(receiveAddress, sourceAddress, ifi, msgReceiveHandler)
 		if err != nil {
 			log.Fatal(err)
 		}
-		return
 	}
+	wg.Wait()
 	log.Println(`Please input the right arguments(use "-h" to see help)`)
 }
 

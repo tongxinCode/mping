@@ -56,7 +56,18 @@ go build -o mping main.go
 
 ## 版本介绍
 v1.4.0
+
 将程序适配go 1.18，增加go mod适配
+
+v1.5.0
+
+1. complete the realtime send process
+2. add the Packet loss rate count function
+3. fix some bugs
+
+v1.6.0
+
+**important** fix bugs
 
 ## golang库未完善
 
