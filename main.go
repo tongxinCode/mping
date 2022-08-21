@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"math"
 	"net"
 	"os"
 	"regexp"
@@ -17,10 +18,11 @@ import (
 	"mping/multicast"
 
 	"golang.org/x/net/ipv4"
+	"golang.org/x/text/encoding/simplifiedchinese"
 )
 
 const (
-	usage = `mping version: mping/1.6.0
+	usage = `mping version: mping/1.7.0
 Usage: ./mping [-h] [-s sendGroup] [-r receiveGroup] [-l localAddress] [-S sourceAddress] [-m message] [-i interval] [-log path]
 
 Options:
@@ -44,9 +46,11 @@ var (
 	localAddress   string
 	sourceAddress  string
 	content        string
+	encoding       string
 	contentByte    []byte
 	interval       int
 	dataSize       int
+	sendLimit      int
 
 	clock_start time.Time
 	clock_end   time.Time
@@ -72,7 +76,6 @@ func init() {
 	bytes_rev_sum = 0
 	packet_rev_sum = 0
 	packet_rev_theory = 0
-	content = fmt.Sprint(packet_number_send)
 	ipReg, _ = regexp.Compile(`((2(5[0-5]|[0-4]\d))|[0-1]?\d{1,2})(\.((2(5[0-5]|[0-4]\d))|[0-1]?\d{1,2})){3}`)
 	addrReg, _ = regexp.Compile(`((2(5[0-5]|[0-4]\d))|[0-1]?\d{1,2})(\.((2(5[0-5]|[0-4]\d))|[0-1]?\d{1,2})){3}:(([2-9]\d{3})|([1-5]\d{4})|(6[0-4]\d{3})|(65[0-4]\d{2})|(655[0-2]\d)|(6553[0-5]))`)
 	flagSettup()
@@ -203,18 +206,20 @@ func logSettup() {
 
 func flagSettup() {
 	flag.BoolVar(&help, "h", false, "this help")
-	flag.BoolVar(&test, "test", false, "send and receive locally to examinate a test")
-	flag.BoolVar(&realtime, "time", false, "send real time as the content to examinate")
-	flag.BoolVar(&hexdata, "x", false, "whether to show the hex data")
-	flag.BoolVar(&count, "c", false, "whether to count Packet loss rate")
+	flag.BoolVar(&test, "test", false, "send and receive locally to examinate a test(default false)")
+	flag.BoolVar(&realtime, "time", false, "send real time as the content to examinate(default false)")
+	flag.BoolVar(&hexdata, "x", false, "whether to show the hex data(default false)")
+	flag.BoolVar(&count, "c", false, "whether to count Packet loss rate(default false)")
 	flag.StringVar(&logPath, "log", "/", "[/tmp/] or [C:\\] determine whether to log, Path e.g ./, Forbidden /")
 	flag.StringVar(&sendAddress, "s", "239.255.255.255:9999", "[group:port] send packet to group")
 	flag.StringVar(&receiveAddress, "r", "239.255.255.255:9999", "[group:port] receive packet from group")
 	flag.StringVar(&localAddress, "l", "127.0.0.1:8888", "[ip[:port]] must choose your local using interface")
 	flag.StringVar(&sourceAddress, "S", "127.0.0.1:8888", "[ip[:port]] must determine the peer source ip if using SSM")
-	flag.StringVar(&content, "m", "Init Data", "[[]byte] change the content of sending")
+	flag.StringVar(&content, "m", "Init Data", "[string] change the content of sending")
+	flag.StringVar(&encoding, "e", "ascii", "['ascii','utf8','gbk'] change the content of sending")
 	flag.IntVar(&interval, "i", 1000000000, "[number] change the interval between package sent (unit:Nanosecond)")
 	flag.IntVar(&dataSize, "p", -1, "[number] the size of payload data(0 means use 1472 Bytes payloads)")
+	flag.IntVar(&sendLimit, "C", -1, "[number] the limit number of sending packets(-1 means no limits)")
 	flag.Usage = flagUsage
 }
 
@@ -242,17 +247,60 @@ func processCommands() {
 		log.Fatal(err)
 	}
 	if dataSize == -1 {
-		var data []byte = make([]byte, 4)
-		contentByte = strconv.AppendQuoteToASCII(data, content)
+		if count {
+			var data []byte = make([]byte, 4)
+			if encoding == "ascii" {
+				contentByte = strconv.AppendQuoteToASCII(data, content)
+			} else if encoding == "utf8" {
+				contentByte = append(data, []byte(content)...)
+			} else if encoding == "gbk" {
+				contentByteTmp, _ := simplifiedchinese.GBK.NewDecoder().Bytes([]byte(content))
+				contentByte = append(data, contentByteTmp...)
+			} else {
+				log.Fatal("unsupported encoding format")
+			}
+		} else {
+			if encoding == "ascii" {
+				contentByte = []byte(strconv.QuoteToASCII(content))
+			} else if encoding == "utf8" {
+				contentByte = []byte(content)
+			} else if encoding == "gbk" {
+				contentByte, _ = simplifiedchinese.GBK.NewDecoder().Bytes([]byte(content))
+			} else {
+				log.Fatal("unsupported encoding format")
+			}
+		}
 	} else if dataSize == 0 {
 		dataSize = FIT_DATA_SIZE
 		var data []byte = make([]byte, dataSize-len(content))
-		contentByte = strconv.AppendQuoteToASCII(data, content)
+		if encoding == "ascii" {
+			contentByte = strconv.AppendQuoteToASCII(data, content)
+		} else if encoding == "utf8" {
+			contentByte = append(data, []byte(content)...)
+		} else if encoding == "gbk" {
+			contentByteTmp, _ := simplifiedchinese.GBK.NewDecoder().Bytes([]byte(content))
+			contentByte = append(data, contentByteTmp...)
+		} else {
+			log.Fatal("unsupported encoding format")
+		}
 	} else if dataSize > 0 && dataSize < 4 {
-		log.Fatal("small packet")
+		if count {
+			log.Fatal("small packet")
+		} else {
+			contentByte = make([]byte, dataSize)
+		}
 	} else if dataSize > len(content) && dataSize <= MAX_DATA_SIZE {
 		var data []byte = make([]byte, dataSize-len(content))
-		contentByte = strconv.AppendQuoteToASCII(data, content)
+		if encoding == "ascii" {
+			contentByte = strconv.AppendQuoteToASCII(data, content)
+		} else if encoding == "utf8" {
+			contentByte = append(data, []byte(content)...)
+		} else if encoding == "gbk" {
+			contentByteTmp, _ := simplifiedchinese.GBK.NewDecoder().Bytes([]byte(content))
+			contentByte = append(data, contentByteTmp...)
+		} else {
+			log.Fatal("unsupported encoding format")
+		}
 	} else if dataSize > MAX_DATA_SIZE {
 		log.Fatal("big packet")
 	}
@@ -267,9 +315,21 @@ func processCommands() {
 			}
 			for {
 				packet_number_send++
+				if sendLimit > 0 && sendLimit < math.MaxInt && packet_number_send > uint32(sendLimit) {
+					return
+				}
 				if realtime {
 					content = time.Now().Format("2006-01-02 15:04:05")
-					contentByte = strconv.AppendQuoteToASCII(contentByte[0:4], content)
+					if encoding == "ascii" {
+						contentByte = strconv.AppendQuoteToASCII(contentByte[0:4], content)
+					} else if encoding == "utf8" {
+						contentByte = append(contentByte[0:4], []byte(content)...)
+					} else if encoding == "gbk" {
+						contentByteTmp, _ := simplifiedchinese.GBK.NewDecoder().Bytes([]byte(content))
+						contentByte = append(contentByte[0:4], contentByteTmp...)
+					} else {
+						log.Fatal("unsupported encoding format")
+					}
 				}
 				if count {
 					binary.BigEndian.PutUint32(contentByte[0:4], packet_number_send)
@@ -296,9 +356,21 @@ func processCommands() {
 			}
 			for {
 				packet_number_send++
+				if sendLimit > 0 && sendLimit < math.MaxInt && packet_number_send > uint32(sendLimit) {
+					return
+				}
 				if realtime {
 					content = time.Now().Format("2006-01-02 15:04:05")
-					contentByte = strconv.AppendQuoteToASCII(contentByte[0:4], content)
+					if encoding == "ascii" {
+						contentByte = strconv.AppendQuoteToASCII(contentByte[0:4], content)
+					} else if encoding == "utf8" {
+						contentByte = append(contentByte[0:4], []byte(content)...)
+					} else if encoding == "gbk" {
+						contentByteTmp, _ := simplifiedchinese.GBK.NewDecoder().Bytes([]byte(content))
+						contentByte = append(contentByte[0:4], contentByteTmp...)
+					} else {
+						log.Fatal("unsupported encoding format")
+					}
 				}
 				if count {
 					binary.BigEndian.PutUint32(contentByte[0:4], packet_number_send)
@@ -330,9 +402,21 @@ func processCommands() {
 			}
 			for {
 				packet_number_send++
+				if sendLimit > 0 && sendLimit < math.MaxInt && packet_number_send > uint32(sendLimit) {
+					return
+				}
 				if realtime {
 					content = time.Now().Format("2006-01-02 15:04:05")
-					contentByte = strconv.AppendQuoteToASCII(contentByte[0:4], content)
+					if encoding == "ascii" {
+						contentByte = strconv.AppendQuoteToASCII(contentByte[0:4], content)
+					} else if encoding == "utf8" {
+						contentByte = append(contentByte[0:4], []byte(content)...)
+					} else if encoding == "gbk" {
+						contentByteTmp, _ := simplifiedchinese.GBK.NewDecoder().Bytes([]byte(content))
+						contentByte = append(contentByte[0:4], contentByteTmp...)
+					} else {
+						log.Fatal("unsupported encoding format")
+					}
 				}
 				if count {
 					binary.BigEndian.PutUint32(contentByte[0:4], packet_number_send)
@@ -349,7 +433,6 @@ func processCommands() {
 		}
 	}
 	wg.Wait()
-	log.Println(`Please input the right arguments(use "-h" to see help)`)
 }
 
 func processArgs() {

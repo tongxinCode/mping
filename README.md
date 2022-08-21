@@ -69,6 +69,12 @@ v1.6.0
 
 **important** fix bugs
 
+v1.7.0
+
+1. complete the limit of sending packets
+2. fix the conflict of count and content(message)
+3. add the encoding choices of content(message)
+
 ## golang库未完善
 
 ☞ On Windows, the ReadBatch and WriteBatch methods of PacketConn are not implemented.
