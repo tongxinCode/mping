@@ -254,7 +254,7 @@ func processCommands() {
 			} else if encoding == "utf8" {
 				contentByte = append(data, []byte(content)...)
 			} else if encoding == "gbk" {
-				contentByteTmp, _ := simplifiedchinese.GBK.NewDecoder().Bytes([]byte(content))
+				contentByteTmp, _ := simplifiedchinese.GBK.NewEncoder().Bytes([]byte(content))
 				contentByte = append(data, contentByteTmp...)
 			} else {
 				log.Fatal("unsupported encoding format")
@@ -265,7 +265,7 @@ func processCommands() {
 			} else if encoding == "utf8" {
 				contentByte = []byte(content)
 			} else if encoding == "gbk" {
-				contentByte, _ = simplifiedchinese.GBK.NewDecoder().Bytes([]byte(content))
+				contentByte, _ = simplifiedchinese.GBK.NewEncoder().Bytes([]byte(content))
 			} else {
 				log.Fatal("unsupported encoding format")
 			}
@@ -278,7 +278,7 @@ func processCommands() {
 		} else if encoding == "utf8" {
 			contentByte = append(data, []byte(content)...)
 		} else if encoding == "gbk" {
-			contentByteTmp, _ := simplifiedchinese.GBK.NewDecoder().Bytes([]byte(content))
+			contentByteTmp, _ := simplifiedchinese.GBK.NewEncoder().Bytes([]byte(content))
 			contentByte = append(data, contentByteTmp...)
 		} else {
 			log.Fatal("unsupported encoding format")
@@ -296,7 +296,7 @@ func processCommands() {
 		} else if encoding == "utf8" {
 			contentByte = append(data, []byte(content)...)
 		} else if encoding == "gbk" {
-			contentByteTmp, _ := simplifiedchinese.GBK.NewDecoder().Bytes([]byte(content))
+			contentByteTmp, _ := simplifiedchinese.GBK.NewEncoder().Bytes([]byte(content))
 			contentByte = append(data, contentByteTmp...)
 		} else {
 			log.Fatal("unsupported encoding format")
@@ -325,7 +325,7 @@ func processCommands() {
 					} else if encoding == "utf8" {
 						contentByte = append(contentByte[0:4], []byte(content)...)
 					} else if encoding == "gbk" {
-						contentByteTmp, _ := simplifiedchinese.GBK.NewDecoder().Bytes([]byte(content))
+						contentByteTmp, _ := simplifiedchinese.GBK.NewEncoder().Bytes([]byte(content))
 						contentByte = append(contentByte[0:4], contentByteTmp...)
 					} else {
 						log.Fatal("unsupported encoding format")
@@ -366,7 +366,7 @@ func processCommands() {
 					} else if encoding == "utf8" {
 						contentByte = append(contentByte[0:4], []byte(content)...)
 					} else if encoding == "gbk" {
-						contentByteTmp, _ := simplifiedchinese.GBK.NewDecoder().Bytes([]byte(content))
+						contentByteTmp, _ := simplifiedchinese.GBK.NewEncoder().Bytes([]byte(content))
 						contentByte = append(contentByte[0:4], contentByteTmp...)
 					} else {
 						log.Fatal("unsupported encoding format")
@@ -412,7 +412,7 @@ func processCommands() {
 					} else if encoding == "utf8" {
 						contentByte = append(contentByte[0:4], []byte(content)...)
 					} else if encoding == "gbk" {
-						contentByteTmp, _ := simplifiedchinese.GBK.NewDecoder().Bytes([]byte(content))
+						contentByteTmp, _ := simplifiedchinese.GBK.NewEncoder().Bytes([]byte(content))
 						contentByte = append(contentByte[0:4], contentByteTmp...)
 					} else {
 						log.Fatal("unsupported encoding format")
