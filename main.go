@@ -19,10 +19,12 @@ import (
 
 	"golang.org/x/net/ipv4"
 	"golang.org/x/text/encoding/simplifiedchinese"
+
+	lua "github.com/yuin/gopher-lua"
 )
 
 const (
-	usage = `mping version: mping/1.7.0
+	usage = `mping version: mping/1.8.0
 Usage: ./mping [-h] [-s sendGroup] [-r receiveGroup] [-l localAddress] [-S sourceAddress] [-m message] [-i interval] [-log path]
 
 Options:
@@ -41,6 +43,7 @@ var (
 	hexdata        bool
 	count          bool
 	logPath        string
+	protoPath      string
 	sendAddress    string
 	receiveAddress string
 	localAddress   string
@@ -66,6 +69,8 @@ var (
 
 	rawlog *log.Logger
 
+	luaState *lua.LState
+
 	ipReg   *regexp.Regexp
 	addrReg *regexp.Regexp
 )
@@ -84,8 +89,12 @@ func init() {
 func main() {
 	flag.Parse()
 	logSettup()
+	luaSettup()
 	processArgs()
 	processCommands()
+	if luaState != nil {
+		defer luaState.Close()
+	}
 }
 
 func msgReceiveHandler(cm *ipv4.ControlMessage, src net.Addr, n int, b []byte) {
@@ -124,6 +133,16 @@ func msgReceiveHandler(cm *ipv4.ControlMessage, src net.Addr, n int, b []byte) {
 	log.Println(n, "bytes read from", src)
 	if hexdata {
 		rawlog.Println(hex.Dump(b[:n]))
+	}
+	if protoPath != "*.lua" {
+		err := luaState.CallByParam(lua.P{
+			Fn:      luaState.GetGlobal("Parse"),
+			NRet:    0,
+			Protect: true,
+		}, lua.LString(b[:n]))
+		if err != nil {
+			log.Panic(err)
+		}
 	}
 }
 
@@ -204,6 +223,16 @@ func logSettup() {
 	}
 }
 
+func luaSettup() {
+	if protoPath != "*.lua" {
+		luaState = lua.NewState()
+		err := luaState.DoFile(protoPath)
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
+}
+
 func flagSettup() {
 	flag.BoolVar(&help, "h", false, "this help")
 	flag.BoolVar(&test, "test", false, "send and receive locally to examinate a test(default false)")
@@ -211,6 +240,7 @@ func flagSettup() {
 	flag.BoolVar(&hexdata, "x", false, "whether to show the hex data(default false)")
 	flag.BoolVar(&count, "c", false, "whether to count Packet loss rate(default false)")
 	flag.StringVar(&logPath, "log", "/", "[/tmp/] or [C:\\] determine whether to log, Path e.g ./, Forbidden /")
+	flag.StringVar(&protoPath, "proto", "*.lua", "choose a lua script to parse udp data, function Parse(dataBytes) must be included")
 	flag.StringVar(&sendAddress, "s", "239.255.255.255:9999", "[group:port] send packet to group")
 	flag.StringVar(&receiveAddress, "r", "239.255.255.255:9999", "[group:port] receive packet from group")
 	flag.StringVar(&localAddress, "l", "127.0.0.1:8888", "[ip[:port]] must choose your local using interface")

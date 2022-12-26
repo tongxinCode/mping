@@ -1,3 +1,5 @@
+github.com/yuin/gopher-lua v0.0.0-20221210110428-332342483e3f h1:wihIB0V/mGpVYrL8I7n/WxVqWnP07CBXZ5uCgxUP1tI=
+github.com/yuin/gopher-lua v0.0.0-20221210110428-332342483e3f/go.mod h1:GBR0iDaNXjAgGg9zfCvksxSRnQx76gclCIb7kdAd1Pw=
 golang.org/x/net v0.0.0-20220706163947-c90051bbdb60 h1:8NSylCMxLW4JvserAndSgFL7aPli6A68yf0bYFTcWCM=
 golang.org/x/net v0.0.0-20220706163947-c90051bbdb60/go.mod h1:XRhObCWvk6IyKnWLug+ECip1KBveYUHfp+8e9klMJ9c=
 golang.org/x/sys v0.0.0-20220520151302-bc2c85ada10a h1:dGzPydgVsqGcTRVwiLJ1jVbufYwmzD3LfVPLKsKg+0k=
