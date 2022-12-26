@@ -1,7 +1,7 @@
 # mping
 [executable] multicast test for multicast testing ASM & SSM sending and receiving
 
-[可执行] 组播测试工具（指定源组播和任意源组播首发）
+[可执行] 组播测试工具（指定源组播和任意源组播收发）
 
 # 使用说明
 跨平台、系统编译请参照编译说明
