@@ -1,7 +1,7 @@
 # mping
 [executable] multicast test for multicast testing ASM & SSM sending and receiving
 
-[可执行] 组播测试工具（指定源组播和任意源组播shou'fa）
+[可执行] 组播测试工具（指定源组播和任意源组播首发）
 
 # 使用说明
 跨平台、系统编译请参照编译说明
@@ -74,6 +74,9 @@ v1.7.0
 1. complete the limit of sending packets
 2. fix the conflict of count and content(message)
 3. add the encoding choices of content(message)
+
+v1.8.0
+**important** add the lua interface hot-plugin to parse the udp data protocol
 
 ## golang库未完善
 
