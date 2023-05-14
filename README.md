@@ -78,6 +78,10 @@ v1.7.0
 v1.8.0
 **important** add the lua interface hot-plugin to parse the udp data protocol
 
+v1.8.1
+
+**important** 适配go1.20，更新依赖消除安全告警
+
 ## golang库未完善
 
 ☞ On Windows, the ReadBatch and WriteBatch methods of PacketConn are not implemented.

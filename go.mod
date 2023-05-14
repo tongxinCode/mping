@@ -1,13 +1,11 @@
 module mping
 
-go 1.18
+go 1.20
 
 require (
-	golang.org/x/net v0.0.0-20220706163947-c90051bbdb60
-	golang.org/x/text v0.3.7
+	github.com/yuin/gopher-lua v1.1.0
+	golang.org/x/net v0.10.0
+	golang.org/x/text v0.9.0
 )
 
-require (
-	github.com/yuin/gopher-lua v0.0.0-20221210110428-332342483e3f // indirect
-	golang.org/x/sys v0.0.0-20220520151302-bc2c85ada10a // indirect
-)
+require golang.org/x/sys v0.8.0 // indirect
