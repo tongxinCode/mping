@@ -24,7 +24,7 @@ import (
 )
 
 const (
-	usage = `mping version: mping/1.8.1
+	usage = `mping version: mping/1.8.2
 Usage: ./mping [-h] [-s sendGroup] [-r receiveGroup] [-l localAddress] [-S sourceAddress] [-m message] [-i interval] [-log path]
 
 Options:
@@ -135,8 +135,9 @@ func msgReceiveHandler(cm *ipv4.ControlMessage, src net.Addr, n int, b []byte) {
 		rawlog.Println(hex.Dump(b[:n]))
 	}
 	if protoPath != "*.lua" {
+		// 调用Lua函数
 		err := luaState.CallByParam(lua.P{
-			Fn:      luaState.GetGlobal("Parse"),
+			Fn:      luaState.GetGlobal("Decode"),
 			NRet:    0,
 			Protect: true,
 		}, lua.LString(b[:n]))
@@ -225,7 +226,9 @@ func logSettup() {
 
 func luaSettup() {
 	if protoPath != "*.lua" {
+		// 创建一个新的Lua虚拟机
 		luaState = lua.NewState()
+		// 加载Lua文件
 		err := luaState.DoFile(protoPath)
 		if err != nil {
 			log.Fatal(err)
@@ -240,7 +243,7 @@ func flagSettup() {
 	flag.BoolVar(&hexdata, "x", false, "whether to show the hex data(default false)")
 	flag.BoolVar(&count, "c", false, "whether to count Packet loss rate(default false)")
 	flag.StringVar(&logPath, "log", "/", "[/tmp/] or [C:\\] determine whether to log, Path e.g ./, Forbidden /")
-	flag.StringVar(&protoPath, "proto", "*.lua", "choose a lua script to parse udp data, function Parse(dataBytes) must be included")
+	flag.StringVar(&protoPath, "proto", "*.lua", "choose a lua script to decode/encode udp data, function Decode(dataBytes)/Encode() must be included")
 	flag.StringVar(&sendAddress, "s", "239.255.255.255:9999", "[group:port] send packet to group")
 	flag.StringVar(&receiveAddress, "r", "239.255.255.255:9999", "[group:port] receive packet from group")
 	flag.StringVar(&localAddress, "l", "127.0.0.1:8888", "[ip[:port]] must choose your local using interface")
@@ -348,6 +351,28 @@ func processCommands() {
 				if sendLimit > 0 && sendLimit < math.MaxInt && packet_number_send > uint32(sendLimit) {
 					return
 				}
+				if protoPath != "*.lua" {
+					// 调用Lua函数
+					err := luaState.CallByParam(lua.P{
+						Fn:      luaState.GetGlobal("Encode"),
+						NRet:    1,
+						Protect: true,
+					}, lua.LNil)
+					if err != nil {
+						log.Panic(err)
+					}
+					// 获取返回值
+					returnValue := luaState.Get(-1)
+					str := returnValue.String()
+					// 发送Lua函数的返回值
+					err = multicast.Send(p, []byte(str), interval, msgSendHandler)
+					if err != nil {
+						log.Fatal(err)
+					}
+					// 弹出返回值
+					luaState.Pop(1)
+					continue
+				}
 				if realtime {
 					content = time.Now().Format("2006-01-02 15:04:05")
 					if encoding == "ascii" {
@@ -388,6 +413,28 @@ func processCommands() {
 				packet_number_send++
 				if sendLimit > 0 && sendLimit < math.MaxInt && packet_number_send > uint32(sendLimit) {
 					return
+				}
+				if protoPath != "*.lua" {
+					// 调用Lua函数
+					err := luaState.CallByParam(lua.P{
+						Fn:      luaState.GetGlobal("Encode"),
+						NRet:    1,
+						Protect: true,
+					}, lua.LNil)
+					if err != nil {
+						log.Panic(err)
+					}
+					// 获取返回值
+					returnValue := luaState.Get(-1)
+					str := returnValue.String()
+					// 发送Lua函数的返回值
+					err = multicast.Send(p, []byte(str), interval, msgSendHandler)
+					if err != nil {
+						log.Fatal(err)
+					}
+					// 弹出返回值
+					luaState.Pop(1)
+					continue
 				}
 				if realtime {
 					content = time.Now().Format("2006-01-02 15:04:05")

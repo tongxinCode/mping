@@ -1,27 +1,32 @@
 # mping
+
 [executable] multicast test for multicast testing ASM & SSM sending and receiving
 
 [可执行] 组播测试工具（指定源组播和任意源组播收发）
 
-# 使用说明
+## 使用说明
+
 跨平台、系统编译请参照编译说明
 
 二进制文件和EXE文件选择相应的文件进行运行
 
 运行以下命令查看帮助
+
 ```bash
 go run main.go -h    
 # or    
 ./programe -h
 ```
 
-# 核心代码
-    main.go
-    ./multicast
-    --broadcaster.go
-    --listener.go
+## 核心代码
+
+main.go
+./multicast
+--broadcaster.go
+--listener.go
 
 ## 编译说明
+
 下方给出了go编译的示例，你也可以使用build.sh编译构建
 
 ```bash
@@ -52,9 +57,10 @@ go build -o mping main.go
 
 ```
 
-# 注意事项
+## 注意事项
 
 ## 版本介绍
+
 v1.4.0
 
 将程序适配go 1.18，增加go mod适配
@@ -82,6 +88,10 @@ v1.8.1
 
 **important** 适配go1.20，更新依赖消除安全告警
 
+v1.8.2
+
+use the lua interface hot-plugin to generate random udp data
+
 ## golang库未完善
 
 ☞ On Windows, the ReadBatch and WriteBatch methods of PacketConn are not implemented.
@@ -96,4 +106,4 @@ v1.8.1
 
 ☞ On Windows, the ControlMessage for ReadFrom and WriteTo methods of PacketConn is not implemented.
 
-详情见https://godoc.org/golang.org/x/net/ipv4#NewPacketConn
+详情见<https://godoc.org/golang.org/x/net/ipv4#NewPacketConn>
