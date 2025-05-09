@@ -16,7 +16,7 @@ build/*
 .VSCodeCounter
 
 # protocol
-script/lua/Protocol.lua
+script/
 
 # Dependency directories (remove the comment below to include it)
 # vendor/

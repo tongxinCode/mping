@@ -24,8 +24,8 @@ import (
 )
 
 const (
-	usage = `mping version: mping/1.8.2
-Usage: ./mping [-h] [-s sendGroup] [-r receiveGroup] [-l localAddress] [-S sourceAddress] [-m message] [-i interval] [-log path]
+	usage = `mping version: mping/1.8.3
+Usage: ./mping [-h] [-s sendGroup] [-r receiveGroup] [-l localAddress] [-S sourceAddress] [-m message] [-i interval] [-log path] [-nolog] [-proto test.lua]
 
 Options:
 `
@@ -42,6 +42,8 @@ var (
 	realtime       bool
 	hexdata        bool
 	count          bool
+	protoStatic    bool
+	nolog          bool
 	logPath        string
 	protoPath      string
 	sendAddress    string
@@ -206,22 +208,27 @@ func logSettup() {
 	// log.SetFlags(log.Lshortfile | log.LstdFlags)
 	log.SetFlags(log.LstdFlags)
 	// define the log writer
-	if logPath != "/" {
-		file := logPath + time.Now().Format("2006-01-02 15-04") + ".log"
-		logFile, err := os.OpenFile(file, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0766)
-		if err != nil {
-			log.Fatal(err)
-		}
-		writers := []io.Writer{
-			logFile,
-			os.Stdout,
-		}
-		fileAndStdoutWriter := io.MultiWriter(writers...)
-		log.SetOutput(fileAndStdoutWriter)
-		rawlog = log.New(fileAndStdoutWriter, "", 0)
+	if nolog {
+		log.SetOutput(io.Discard)
 	} else {
-		rawlog = log.New(os.Stdout, "", 0)
+		if logPath != "/" {
+			file := logPath + time.Now().Format("2006-01-02 15-04") + ".log"
+			logFile, err := os.OpenFile(file, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0766)
+			if err != nil {
+				log.Fatal(err)
+			}
+			writers := []io.Writer{
+				logFile,
+				os.Stdout,
+			}
+			fileAndStdoutWriter := io.MultiWriter(writers...)
+			log.SetOutput(fileAndStdoutWriter)
+			rawlog = log.New(fileAndStdoutWriter, "", 0)
+		} else {
+			rawlog = log.New(os.Stdout, "", 0)
+		}
 	}
+
 }
 
 func luaSettup() {
@@ -242,8 +249,10 @@ func flagSettup() {
 	flag.BoolVar(&realtime, "time", false, "send real time as the content to examinate(default false)")
 	flag.BoolVar(&hexdata, "x", false, "whether to show the hex data(default false)")
 	flag.BoolVar(&count, "c", false, "whether to count Packet loss rate(default false)")
+	flag.BoolVar(&nolog, "nolog", false, "whether to log nothing(default false)")
 	flag.StringVar(&logPath, "log", "/", "[/tmp/] or [C:\\] determine whether to log, Path e.g ./, Forbidden /")
 	flag.StringVar(&protoPath, "proto", "*.lua", "choose a lua script to decode/encode udp data, function Decode(dataBytes)/Encode() must be included")
+	flag.BoolVar(&protoStatic, "ps", false, "use with '-proto' to determine whether to generate static data, default to generate data by lua every time")
 	flag.StringVar(&sendAddress, "s", "239.255.255.255:9999", "[group:port] send packet to group")
 	flag.StringVar(&receiveAddress, "r", "239.255.255.255:9999", "[group:port] receive packet from group")
 	flag.StringVar(&localAddress, "l", "127.0.0.1:8888", "[ip[:port]] must choose your local using interface")
@@ -257,7 +266,7 @@ func flagSettup() {
 }
 
 func flagUsage() {
-	fmt.Fprintf(os.Stderr, usage)
+	fmt.Fprint(os.Stderr, usage)
 	flag.PrintDefaults()
 }
 
@@ -346,31 +355,56 @@ func processCommands() {
 			if err != nil || p.UdpConn == nil || p.PacketConn == nil {
 				log.Fatal(err)
 			}
+			if protoStatic {
+				// 调用Lua函数
+				err := luaState.CallByParam(lua.P{
+					Fn:      luaState.GetGlobal("Encode"),
+					NRet:    1,
+					Protect: true,
+				}, lua.LNil)
+				if err != nil {
+					log.Panic(err)
+				}
+				// 获取返回值
+				returnValue := luaState.Get(-1)
+				content = returnValue.String()
+				// 弹出返回值
+				luaState.Pop(1)
+			}
 			for {
 				packet_number_send++
 				if sendLimit > 0 && sendLimit < math.MaxInt && packet_number_send > uint32(sendLimit) {
 					return
 				}
-				if protoPath != "*.lua" {
-					// 调用Lua函数
-					err := luaState.CallByParam(lua.P{
-						Fn:      luaState.GetGlobal("Encode"),
-						NRet:    1,
-						Protect: true,
-					}, lua.LNil)
-					if err != nil {
-						log.Panic(err)
+				if !protoStatic {
+					if protoPath != "*.lua" {
+						// 调用Lua函数
+						err := luaState.CallByParam(lua.P{
+							Fn:      luaState.GetGlobal("Encode"),
+							NRet:    1,
+							Protect: true,
+						}, lua.LNil)
+						if err != nil {
+							log.Panic(err)
+						}
+						// 获取返回值
+						returnValue := luaState.Get(-1)
+						str := returnValue.String()
+						// 发送Lua函数的返回值
+						err = multicast.Send(p, []byte(str), interval, msgSendHandler)
+						if err != nil {
+							log.Fatal(err)
+						}
+						// 弹出返回值
+						luaState.Pop(1)
+						continue
 					}
-					// 获取返回值
-					returnValue := luaState.Get(-1)
-					str := returnValue.String()
+				} else {
 					// 发送Lua函数的返回值
-					err = multicast.Send(p, []byte(str), interval, msgSendHandler)
+					err = multicast.Send(p, []byte(content), interval, msgSendHandler)
 					if err != nil {
 						log.Fatal(err)
 					}
-					// 弹出返回值
-					luaState.Pop(1)
 					continue
 				}
 				if realtime {
@@ -409,31 +443,56 @@ func processCommands() {
 			if err != nil || p.UdpConn == nil || p.PacketConn == nil {
 				log.Fatal(err)
 			}
+			if protoStatic {
+				// 调用Lua函数
+				err := luaState.CallByParam(lua.P{
+					Fn:      luaState.GetGlobal("Encode"),
+					NRet:    1,
+					Protect: true,
+				}, lua.LNil)
+				if err != nil {
+					log.Panic(err)
+				}
+				// 获取返回值
+				returnValue := luaState.Get(-1)
+				content = returnValue.String()
+				// 弹出返回值
+				luaState.Pop(1)
+			}
 			for {
 				packet_number_send++
 				if sendLimit > 0 && sendLimit < math.MaxInt && packet_number_send > uint32(sendLimit) {
 					return
 				}
-				if protoPath != "*.lua" {
-					// 调用Lua函数
-					err := luaState.CallByParam(lua.P{
-						Fn:      luaState.GetGlobal("Encode"),
-						NRet:    1,
-						Protect: true,
-					}, lua.LNil)
-					if err != nil {
-						log.Panic(err)
+				if !protoStatic {
+					if protoPath != "*.lua" {
+						// 调用Lua函数
+						err := luaState.CallByParam(lua.P{
+							Fn:      luaState.GetGlobal("Encode"),
+							NRet:    1,
+							Protect: true,
+						}, lua.LNil)
+						if err != nil {
+							log.Panic(err)
+						}
+						// 获取返回值
+						returnValue := luaState.Get(-1)
+						str := returnValue.String()
+						// 发送Lua函数的返回值
+						err = multicast.Send(p, []byte(str), interval, msgSendHandler)
+						if err != nil {
+							log.Fatal(err)
+						}
+						// 弹出返回值
+						luaState.Pop(1)
+						continue
 					}
-					// 获取返回值
-					returnValue := luaState.Get(-1)
-					str := returnValue.String()
+				} else {
 					// 发送Lua函数的返回值
-					err = multicast.Send(p, []byte(str), interval, msgSendHandler)
+					err = multicast.Send(p, []byte(content), interval, msgSendHandler)
 					if err != nil {
 						log.Fatal(err)
 					}
-					// 弹出返回值
-					luaState.Pop(1)
 					continue
 				}
 				if realtime {

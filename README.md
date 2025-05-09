@@ -15,7 +15,7 @@
 ```bash
 go run main.go -h    
 # or    
-./programe -h
+./mping -h
 ```
 
 ## 核心代码
@@ -91,6 +91,11 @@ v1.8.1
 v1.8.2
 
 use the lua interface hot-plugin to generate random udp data
+
+v1.8.3
+
+1. optimize the way of using lua to make the ratio of packets more efficient
+2. add the nolog choice
 
 ## golang库未完善
 
